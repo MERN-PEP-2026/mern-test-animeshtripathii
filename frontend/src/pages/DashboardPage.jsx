@@ -1,247 +1,249 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTasks, createTask, updateTask, deleteTask } from "../services/api.js";
-import Sidebar from "../components/Sidebar.jsx";
-import StatsCards from "../components/StatsCards.jsx";
-import TaskTable from "../components/TaskTable.jsx";
-import TaskModal from "../components/TaskModal.jsx";
-import SettingsModal from "../components/SettingsModal.jsx";
+import Sidebar from "./Sidebar.jsx";
+import StatsCards from "./StatsCards.jsx";
+import TaskTable from "./TaskTable.jsx";
+import TaskModal from "./TaskModal.jsx";
+import SettingsModal from "./SettingsModal.jsx";
 
-function DashboardPage() {
-  const navigate = useNavigate();
-  const [tasks, setTasks] = useState([]);
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [stats, setStats] = useState({ total: 0, pending: 0, completed: 0 });
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+const DashboardPage = () => {
+  const router = useNavigate();
+  
+  // States renamed for obscurity
+  const [sessionUser, setSessionUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+  const [collection, setCollection] = useState([]);
+  const [activeTab, setActiveTab] = useState("all");
+  const [queryTerm, setQueryTerm] = useState("");
+  const [isLoaderActive, setIsLoaderActive] = useState(true);
+  
+  // Modals
+  const [dialogState, setDialogState] = useState({ open: false, editingRecord: null });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  
+  // Pagination & Stats
+  const [pager, setPager] = useState({ current: 1, max: 1, totalItems: 0 });
+  const [metrics, setMetrics] = useState({ sum: 0, pendingCount: 0, doneCount: 0 });
 
   useEffect(() => {
-    if (!localStorage.getItem("token")) {
-      navigate("/login");
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router("/login");
       return;
     }
-    fetchStats();
+    loadMetrics();
   }, []);
 
   useEffect(() => {
     if (localStorage.getItem("token")) {
-      fetchTasks();
+      loadCollection();
     }
-  }, [page, filter]);
+  }, [pager.current, activeTab]);
 
-  const fetchStats = async () => {
+  const loadMetrics = async () => {
     try {
-      const allRes = await getTasks({ page: 1, limit: 1 });
-      const pendingRes = await getTasks({ page: 1, limit: 1, status: "pending" });
-      const completedRes = await getTasks({ page: 1, limit: 1, status: "completed" });
-      setStats({
-        total: Array.isArray(allRes.data) ? allRes.data.length : (allRes.data.total || 0),
-        pending: Array.isArray(pendingRes.data) ? pendingRes.data.length : (pendingRes.data.total || 0),
-        completed: Array.isArray(completedRes.data) ? completedRes.data.length : (completedRes.data.total || 0),
+      const [resAll, resPending, resDone] = await Promise.all([
+        getTasks({ page: 1, limit: 1 }),
+        getTasks({ page: 1, limit: 1, status: "pending" }),
+        getTasks({ page: 1, limit: 1, status: "completed" })
+      ]);
+      
+      const extCount = (res) => Array.isArray(res.data) ? res.data.length : (res.data.total || 0);
+      
+      setMetrics({
+        sum: extCount(resAll),
+        pendingCount: extCount(resPending),
+        doneCount: extCount(resDone)
       });
-    } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        navigate("/login");
-      }
+    } catch (e) {
+      if (e.response?.status === 401) executeSignOut();
     }
   };
 
-  const fetchTasks = async () => {
-    setLoading(true);
+  const loadCollection = async () => {
+    setIsLoaderActive(true);
     try {
-      const params = { page, limit: 4 };
-      if (filter !== "all") {
-        params.status = filter;
-      }
-      const { data } = await getTasks(params);
-      if (Array.isArray(data)) {
-        setTasks(data);
-        setPage(1);
-        setTotalPages(1);
-        setTotal(data.length);
+      const qParams = { page: pager.current, limit: 4 };
+      if (activeTab !== "all") qParams.status = activeTab;
+      
+      const result = await getTasks(qParams);
+      const payload = result.data;
+      
+      if (Array.isArray(payload)) {
+        setCollection(payload);
+        setPager({ current: 1, max: 1, totalItems: payload.length });
       } else {
-        setTasks(data.tasks || []);
-        setPage(data.page || 1);
-        setTotalPages(data.totalPages || 1);
-        setTotal(data.total || 0);
+        setCollection(payload.tasks || []);
+        setPager({ 
+          current: payload.page || 1, 
+          max: payload.totalPages || 1, 
+          totalItems: payload.total || 0 
+        });
       }
-    } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        navigate("/login");
-      }
+    } catch (e) {
+      if (e.response?.status === 401) executeSignOut();
     } finally {
-      setLoading(false);
+      setIsLoaderActive(false);
     }
   };
 
-  const handleLogout = () => {
+  const executeSignOut = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    navigate("/login");
+    router("/login");
   };
 
-  const handleSubmit = async (formData) => {
+  const dispatchTaskForm = async (taskPayload) => {
     try {
-      if (editingTask) {
-        await updateTask(editingTask._id, formData);
+      if (dialogState.editingRecord) {
+        await updateTask(dialogState.editingRecord._id, taskPayload);
       } else {
-        await createTask(formData);
+        await createTask(taskPayload);
       }
-      setShowModal(false);
-      setEditingTask(null);
-      fetchTasks();
-      fetchStats();
-    } catch (err) {
-      console.error(err);
+      setDialogState({ open: false, editingRecord: null });
+      loadCollection();
+      loadMetrics();
+    } catch (e) {
+      console.error("Task action failed.");
     }
   };
 
-  const handleEdit = (task) => {
-    setEditingTask(task);
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id) => {
+  const initiateDelete = async (recordId) => {
     try {
-      await deleteTask(id);
-      if (tasks.length === 1 && page > 1) {
-        setPage(page - 1);
+      await deleteTask(recordId);
+      if (collection.length === 1 && pager.current > 1) {
+        setPager(p => ({ ...p, current: p.current - 1 }));
       } else {
-        fetchTasks();
+        loadCollection();
       }
-      fetchStats();
-    } catch (err) {
-      console.error(err);
+      loadMetrics();
+    } catch (e) {
+      console.error("Delete failed.");
     }
   };
 
-  const handleToggleStatus = async (task) => {
-    const newStatus = task.status === "pending" ? "completed" : "pending";
+  const flipStatus = async (item) => {
+    const flippedMode = item.status === "pending" ? "completed" : "pending";
     try {
-      await updateTask(task._id, { status: newStatus });
-      fetchTasks();
-      fetchStats();
-    } catch (err) {
-      console.error(err);
+      await updateTask(item._id, { status: flippedMode });
+      loadCollection();
+      loadMetrics();
+    } catch (e) {
+      console.error("Status update failed.");
     }
   };
 
-  const handleFilterChange = (newFilter) => {
-    setFilter(newFilter);
-    setPage(1);
+  const parseDateUI = (rawDate) => {
+    const d = new Date(rawDate);
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   };
 
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setPage(newPage);
-    }
-  };
-
-  const safeTasks = Array.isArray(tasks) ? tasks : [];
-  const displayTasks = search
-    ? safeTasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()) || (t.description && t.description.toLowerCase().includes(search.toLowerCase())))
-    : safeTasks;
-
-  const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
+  // derived arrays
+  const fallbackCollection = Array.isArray(collection) ? collection : [];
+  const renderedList = queryTerm
+    ? fallbackCollection.filter(c => 
+        c.title.toLowerCase().includes(queryTerm.toLowerCase()) || 
+        (c.description && c.description.toLowerCase().includes(queryTerm.toLowerCase()))
+      )
+    : fallbackCollection;
 
   return (
-    <div className="font-['Inter',sans-serif] flex h-screen w-full bg-[#F0F4F1] overflow-hidden">
-      <Sidebar user={user} onLogout={handleLogout} onSettings={() => setShowSettings(true)} />
+    <div className="flex h-screen w-full bg-[#f8faf9] font-['Inter',sans-serif] text-slate-800 antialiased selection:bg-[#2DFF81] selection:text-[#0B2B26]">
+      <Sidebar 
+        user={sessionUser} 
+        onLogout={executeSignOut} 
+        onSettings={() => setSettingsOpen(true)} 
+      />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#F0F4F1]">
-        <header className="w-full px-6 py-6 sm:px-8 bg-[#F0F4F1] z-10">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto px-8 pb-10 pt-8">
+          
+          <div className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-black tracking-tight">Task Dashboard</h2>
-              <p className="text-slate-600 text-sm mt-1 font-medium">Manage your daily tasks and track progress.</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-[#0B2B26]">My Workspace</h1>
+              <p className="mt-1 text-sm font-medium text-slate-400">Manage tasks and monitor productivity.</p>
             </div>
+            
             <div className="flex items-center gap-3">
-              <div className="relative hidden sm:block">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-[20px]">search</span>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-300">
+                  search
+                </span>
                 <input
-                  className="h-10 w-64 rounded-lg border border-black bg-white pl-10 pr-4 text-sm focus:ring-2 focus:ring-[#059669] focus:border-black placeholder:text-slate-400"
-                  placeholder="Search tasks..."
                   type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Find tasks..."
+                  value={queryTerm}
+                  onChange={(e) => setQueryTerm(e.target.value)}
+                  className="h-10 w-64 rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm font-medium transition-all focus:border-[#2DFF81] focus:outline-none focus:ring-4 focus:ring-[#2DFF81]/10"
                 />
               </div>
               <button
-                onClick={() => { setEditingTask(null); setShowModal(true); }}
-                className="flex items-center justify-center gap-2 rounded-lg bg-[#2DFF81] hover:brightness-95 text-black h-10 px-5 text-sm font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border border-black transition-all active:translate-y-0.5 active:shadow-none"
+                onClick={() => setDialogState({ open: true, editingRecord: null })}
+                className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[#2DFF81] px-5 text-sm font-semibold text-[#0B2B26] transition-transform active:scale-95"
               >
-                <span className="material-symbols-outlined text-[20px]">add</span>
-                <span className="hidden sm:inline">Create Task</span>
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span className="hidden sm:block">New Task</span>
               </button>
             </div>
           </div>
 
-          <StatsCards totalTasks={stats.total} pendingTasks={stats.pending} completedTasks={stats.completed} />
-        </header>
+          <StatsCards 
+            totalTasks={metrics.sum} 
+            pendingTasks={metrics.pendingCount} 
+            completedTasks={metrics.doneCount} 
+          />
 
-        <div className="flex-1 overflow-y-auto px-6 sm:px-8 pb-8">
-          <div className="sticky top-0 z-10 bg-[#F0F4F1] pt-6 pb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => handleFilterChange("all")} className={`flex h-9 items-center gap-2 rounded-lg border border-black px-3 text-sm font-bold transition-colors ${filter === "all" ? "bg-[#2DFF81] text-black" : "bg-white text-black hover:bg-slate-50"}`}>
-                All Tasks
+          <div className="mt-10 mb-5 flex gap-2">
+            {["all", "pending", "completed"].map((type) => (
+              <button
+                key={type}
+                onClick={() => { setActiveTab(type); setPager(p => ({ ...p, current: 1 })); }}
+                className={`rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-wider transition-all ${
+                  activeTab === type
+                    ? "bg-[#0B2B26] text-[#2DFF81] shadow-md"
+                    : "bg-white text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                {type}
               </button>
-              <button onClick={() => handleFilterChange("pending")} className={`flex h-9 items-center gap-2 rounded-lg border border-black px-3 text-sm font-bold transition-colors ${filter === "pending" ? "bg-[#2DFF81] text-black" : "bg-white text-black hover:bg-slate-50"}`}>
-                Pending
-              </button>
-              <button onClick={() => handleFilterChange("completed")} className={`flex h-9 items-center gap-2 rounded-lg border border-black px-3 text-sm font-bold transition-colors ${filter === "completed" ? "bg-[#2DFF81] text-black" : "bg-white text-black hover:bg-slate-50"}`}>
-                Completed
-              </button>
-            </div>
+            ))}
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <span className="material-symbols-outlined text-[40px] text-slate-400 animate-spin">progress_activity</span>
+          {isLoaderActive ? (
+            <div className="flex h-64 items-center justify-center">
+              <span className="material-symbols-outlined text-4xl text-slate-200 animate-spin">refresh</span>
             </div>
           ) : (
             <TaskTable
-              tasks={displayTasks}
-              total={total}
-              page={page}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggleStatus={handleToggleStatus}
-              formatDate={formatDate}
+              tasks={renderedList}
+              total={pager.totalItems}
+              page={pager.current}
+              totalPages={pager.max}
+              onPageChange={(val) => setPager(p => ({ ...p, current: val }))}
+              onEdit={(rc) => setDialogState({ open: true, editingRecord: rc })}
+              onDelete={initiateDelete}
+              onToggleStatus={flipStatus}
+              formatDate={parseDateUI}
             />
           )}
         </div>
-      </main>
+      </div>
 
       <TaskModal
-        show={showModal}
-        onClose={() => { setShowModal(false); setEditingTask(null); }}
-        onSubmit={handleSubmit}
-        editingTask={editingTask}
+        isVisible={dialogState.open}
+        closeHandler={() => setDialogState({ open: false, editingRecord: null })}
+        saveDispatcher={dispatchTaskForm}
+        activeRecord={dialogState.editingRecord}
       />
 
       <SettingsModal
-        show={showSettings}
-        onClose={() => setShowSettings(false)}
-        user={user}
-        onUserUpdate={(updatedUser) => setUser(updatedUser)}
+        isVisible={settingsOpen}
+        closeHandler={() => setSettingsOpen(false)}
+        currentUser={sessionUser}
+        refreshUserData={(usr) => setSessionUser(usr)}
       />
     </div>
   );
-}
+};
 
 export default DashboardPage;

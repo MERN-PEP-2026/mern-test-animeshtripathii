@@ -1,131 +1,132 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { updateProfile } from "../services/api.js";
 
-function SettingsModal({ show, onClose, user, onUserUpdate }) {
-  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ text: "", type: "" });
+const SettingsModal = ({ isVisible, closeHandler, currentUser, refreshUserData }) => {
+  const [profileInputs, setProfileInputs] = useState({ name: "", email: "", password: "" });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [feedback, setFeedback] = useState({ msg: "", type: "" });
 
   useEffect(() => {
-    if (user) {
-      setFormData({ name: user.name || "", email: user.email || "", password: "" });
-      setMessage({ text: "", type: "" });
+    if (currentUser) {
+      setProfileInputs({ name: currentUser.name || "", email: currentUser.email || "", password: "" });
+      setFeedback({ msg: "", type: "" });
     }
-  }, [user, show]);
+  }, [currentUser, isVisible]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage({ text: "", type: "" });
+  const updateProp = (field, value) => {
+    setProfileInputs((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const executeSave = async (event) => {
+    event.preventDefault();
+    setIsProcessing(true);
+    setFeedback({ msg: "", type: "" });
     try {
-      const payload = { name: formData.name, email: formData.email };
-      if (formData.password) {
-        payload.password = formData.password;
+      const payloadBody = { name: profileInputs.name, email: profileInputs.email };
+      if (profileInputs.password.trim() !== "") {
+        payloadBody.password = profileInputs.password;
       }
-      const { data } = await updateProfile(payload);
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify({ name: data.name, email: data.email }));
-      onUserUpdate({ name: data.name, email: data.email });
-      setMessage({ text: "Profile updated successfully!", type: "success" });
-      setFormData((prev) => ({ ...prev, password: "" }));
+      
+      const response = await updateProfile(payloadBody);
+      const { token, name, email } = response.data;
+      
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify({ name, email }));
+      
+      refreshUserData({ name, email });
+      setFeedback({ msg: "Information saved successfully.", type: "good" });
+      setProfileInputs((prev) => ({ ...prev, password: "" }));
     } catch (err) {
-      setMessage({ text: err.response?.data?.message || "Failed to update profile", type: "error" });
+      const errMsg = err.response?.data?.message || "An error occurred while saving.";
+      setFeedback({ msg: errMsg, type: "bad" });
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
-  if (!show) return null;
+  if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] w-full max-w-lg mx-4 p-8">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-2xl font-black text-black">Settings</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-black transition-colors">
-            <span className="material-symbols-outlined text-[24px]">close</span>
-          </button>
-        </div>
-        <p className="text-sm text-slate-500 font-medium mb-6">Update your profile information.</p>
-
-        {message.text && (
-          <div className={`mb-4 rounded-lg px-4 py-3 text-sm font-medium ${message.type === "success" ? "bg-green-100 text-green-800 border border-green-300" : "bg-red-100 text-red-800 border border-red-300"}`}>
-            {message.text}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B2B26]/40 p-4 backdrop-blur-sm transition-opacity">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-100">
+        <div className="flex flex-col p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-[#0B2B26]">My Profile</h2>
+              <p className="mt-1 text-sm text-slate-400">Update your account credentials.</p>
+            </div>
+            <button
+              onClick={closeHandler}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-[#0B2B26]"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-bold text-black mb-1.5" htmlFor="settings-name">Name</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <span className="material-symbols-outlined text-[20px]">person</span>
-              </div>
+          {feedback.msg && (
+            <div className={`mb-5 rounded-xl px-4 py-3 text-sm font-medium ${feedback.type === "good" ? "bg-[#2DFF81]/10 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+              {feedback.msg}
+            </div>
+          )}
+
+          <form onSubmit={executeSave} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-[#0B2B26]" htmlFor="setName">Full Name</label>
               <input
-                id="settings-name"
+                id="setName"
                 type="text"
                 required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="block w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm focus:ring-2 focus:ring-[#2DFF81] focus:border-black"
+                value={profileInputs.name}
+                onChange={(e) => updateProp("name", e.target.value)}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-[#0B2B26] transition-all focus:border-[#2DFF81] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#2DFF81]/10"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-bold text-black mb-1.5" htmlFor="settings-email">Email</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <span className="material-symbols-outlined text-[20px]">mail</span>
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-[#0B2B26]" htmlFor="setEmail">Email Address</label>
               <input
-                id="settings-email"
+                id="setEmail"
                 type="email"
                 required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="block w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm focus:ring-2 focus:ring-[#2DFF81] focus:border-black"
+                value={profileInputs.email}
+                onChange={(e) => updateProp("email", e.target.value)}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-[#0B2B26] transition-all focus:border-[#2DFF81] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#2DFF81]/10"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-bold text-black mb-1.5" htmlFor="settings-password">New Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <span className="material-symbols-outlined text-[20px]">lock</span>
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-[#0B2B26]" htmlFor="setPass">New Password</label>
               <input
-                id="settings-password"
+                id="setPass"
                 type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="block w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm focus:ring-2 focus:ring-[#2DFF81] focus:border-black placeholder:text-slate-400"
-                placeholder="Leave blank to keep current password"
+                placeholder="Leave blank if no change"
+                value={profileInputs.password}
+                onChange={(e) => updateProp("password", e.target.value)}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-[#0B2B26] placeholder:text-slate-400 transition-all focus:border-[#2DFF81] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#2DFF81]/10"
               />
             </div>
-          </div>
 
-          <div className="flex gap-3 pt-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-black py-3 text-sm font-bold text-black hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 rounded-lg bg-[#2DFF81] border border-black py-3 text-sm font-black text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:brightness-95 transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-50"
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </form>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={closeHandler}
+                className="flex-1 rounded-xl bg-slate-100 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200"
+              >
+                Discard
+              </button>
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className="flex-1 rounded-xl bg-[#0B2B26] py-2.5 text-sm font-semibold text-[#2DFF81] transition-colors hover:bg-[#071d1a] disabled:opacity-50"
+              >
+                {isProcessing ? "Processing..." : "Update Details"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
-}
+};
 
 export default SettingsModal;

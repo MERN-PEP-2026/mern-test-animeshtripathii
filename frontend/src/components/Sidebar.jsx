@@ -1,47 +1,69 @@
+import React from "react";
 import { useNavigate } from "react-router-dom";
 
-function Sidebar({ user, onLogout, onSettings }) {
+const Sidebar = ({ user: currentUser, onLogout: handleSignOut, onSettings: openSettingsPanel }) => {
+  const appNavigate = useNavigate();
+
+  const navigationLinks = [
+    { name: "Overview", icon: "dashboard", active: true },
+    { name: "My Work", icon: "check_box", active: false },
+    { name: "Schedule", icon: "calendar_month", active: false },
+  ];
+
+  const getInitials = (personName) => {
+    return personName ? personName.charAt(0).toUpperCase() : "?";
+  };
+
   return (
-    <aside className="flex w-72 flex-col justify-between bg-[#0B2B26] p-4">
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-3 px-2 py-1">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2DFF81] ring-2 ring-white/20">
-            <span className="text-sm font-black text-black">{user.name?.charAt(0)?.toUpperCase() || "U"}</span>
+    <nav className="flex w-72 flex-col justify-between bg-[#0B2B26] p-5 shadow-xl shadow-black/10">
+      <div className="space-y-8">
+        <div className="flex items-center gap-4 px-2 tracking-tight">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2DFF81] font-bold text-[#0B2B26] shadow-md">
+            {getInitials(currentUser.name)}
           </div>
-          <div className="flex flex-col">
-            <h1 className="text-white text-sm font-semibold leading-tight">{user.name || "User"}</h1>
-            <p className="text-white/60 text-xs font-medium">{user.email || ""}</p>
+          <div className="flex flex-col overflow-hidden">
+            <span className="truncate text-sm font-medium text-white">{currentUser.name || "Guest User"}</span>
+            <span className="truncate text-xs text-slate-400">{currentUser.email || "No email"}</span>
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1.5">
-          <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[#2DFF81] text-black" href="#">
-            <span className="material-symbols-outlined text-[20px]">dashboard</span>
-            <span className="text-sm font-bold">Dashboard</span>
-          </a>
-          <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors" href="#">
-            <span className="material-symbols-outlined text-[20px]">check_box</span>
-            <span className="text-sm font-medium">My Tasks</span>
-          </a>
-          <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors" href="#">
-            <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-            <span className="text-sm font-medium">Calendar</span>
-          </a>
-        </nav>
+        <ul className="flex flex-col gap-2">
+          {navigationLinks.map((link) => (
+            <li key={link.name}>
+              <a
+                href="#"
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all duration-200 ease-in-out ${
+                  link.active
+                    ? "bg-[#2DFF81]/10 font-semibold text-[#2DFF81]"
+                    : "font-medium text-slate-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[22px]">{link.icon}</span>
+                {link.name}
+              </a>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <div className="flex flex-col gap-1 border-t border-white/10 pt-4">
-        <button onClick={onSettings} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors w-full">
+      <div className="space-y-2 border-t border-white/5 pt-5">
+        <button
+          onClick={openSettingsPanel}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-400 transition-all hover:bg-white/5 hover:text-white"
+        >
           <span className="material-symbols-outlined text-[20px]">settings</span>
-          <span className="text-sm font-medium">Settings</span>
+          Preferences
         </button>
-        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:text-red-400 hover:bg-red-400/10 transition-colors w-full">
+        <button
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-400 transition-all hover:bg-red-500/10 hover:text-red-400"
+        >
           <span className="material-symbols-outlined text-[20px]">logout</span>
-          <span className="text-sm font-medium">Log Out</span>
+          Sign Out
         </button>
       </div>
-    </aside>
+    </nav>
   );
-}
+};
 
 export default Sidebar;
