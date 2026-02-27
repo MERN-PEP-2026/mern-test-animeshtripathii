@@ -2,60 +2,75 @@ const taskService = require("../services/taskService");
 
 const getAllTasks = async (req, res) => {
     try {
-        const tasks = await taskService.getAllTasks(req.user._id);
-        res.status(200).json(tasks);
-    } catch (error) {
-        res
-            .status(error.status || 500)
-            .json({ message: error.message || "Server Error" });
+        const { page = 1, limit = 4, status } = req.query;
+        const paginatedResult = await taskService.getAllTasks(req.user._id, {
+            page: parseInt(page, 10),
+            limit: parseInt(limit, 10),
+            status,
+        });
+        res.status(200).json(paginatedResult);
+    } catch (err) {
+        const statusCode = err.status || 500;
+        res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to retrieve tasks",
+        });
     }
 };
 
 const getTaskById = async (req, res) => {
     try {
-        const task = await taskService.getTaskById(req.params.id, req.user._id);
-        res.status(200).json(task);
-    } catch (error) {
-        res
-            .status(error.status || 500)
-            .json({ message: error.message || "Server Error" });
+        const singleTask = await taskService.getTaskById(req.params.id, req.user._id);
+        res.status(200).json(singleTask);
+    } catch (err) {
+        const statusCode = err.status || 500;
+        res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to retrieve task details",
+        });
     }
 };
 
 const createTask = async (req, res) => {
     try {
-        const task = await taskService.createTask(req.body, req.user._id);
-        res.status(201).json(task);
-    } catch (error) {
-        res
-            .status(error.status || 500)
-            .json({ message: error.message || "Server Error" });
+        const createdTask = await taskService.createTask(req.body, req.user._id);
+        res.status(201).json(createdTask);
+    } catch (err) {
+        const statusCode = err.status || 500;
+        res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to create new task",
+        });
     }
 };
 
 const updateTask = async (req, res) => {
     try {
-        const task = await taskService.updateTask(
+        const modifiedTask = await taskService.updateTask(
             req.params.id,
             req.body,
             req.user._id
         );
-        res.status(200).json(task);
-    } catch (error) {
-        res
-            .status(error.status || 500)
-            .json({ message: error.message || "Server Error" });
+        res.status(200).json(modifiedTask);
+    } catch (err) {
+        const statusCode = err.status || 500;
+        res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to update task",
+        });
     }
 };
 
 const deleteTask = async (req, res) => {
     try {
-        const result = await taskService.deleteTask(req.params.id, req.user._id);
-        res.status(200).json(result);
-    } catch (error) {
-        res
-            .status(error.status || 500)
-            .json({ message: error.message || "Server Error" });
+        const removalResult = await taskService.deleteTask(req.params.id, req.user._id);
+        res.status(200).json(removalResult);
+    } catch (err) {
+        const statusCode = err.status || 500;
+        res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to delete task",
+        });
     }
 };
 
