@@ -2,27 +2,34 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const protect = async (req, res, next) => {
-    let token;
+    const authHeader = req.headers.authorization;
 
-    if (
-        req.headers.authorization &&
-        req.headers.authorization.startsWith("Bearer")
-    ) {
-        try {
-            token = req.headers.authorization.split(" ")[1];
-
-            const decoded = jwt.verify(token, process.env.JWT_Secret_Key);
-
-            req.user = await User.findById(decoded.id).select("-password");
-
-            next();
-        } catch (error) {
-            res.status(401).json({ message: "Not authorized, token failed" });
-        }
+    if (!authHeader || !authHeader.startsWith("Bearer")) {
+        return res.status(401).json({
+            success: false,
+            message: "Access denied - authentication token is missing",
+        });
     }
 
-    if (!token) {
-        res.status(401).json({ message: "Not authorized, no token" });
+    try {
+        const extractedToken = authHeader.split(" ")[1];
+        const decodedPayload = jwt.verify(extractedToken, process.env.JWT_Secret_Key);
+        const authenticatedUser = await User.findById(decodedPayload.id).select("-password");
+
+        if (!authenticatedUser) {
+            return res.status(401).json({
+                success: false,
+                message: "Access denied - user account not found",
+            });
+        }
+
+        req.user = authenticatedUser;
+        next();
+    } catch (err) {
+        return res.status(401).json({
+            success: false,
+            message: "Access denied - token verification failed",
+        });
     }
 };
 
