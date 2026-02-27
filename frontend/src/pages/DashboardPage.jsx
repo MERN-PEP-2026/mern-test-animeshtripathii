@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTasks, createTask, updateTask, deleteTask } from "../services/api.js";
-import Sidebar from "./Sidebar.jsx";
-import StatsCards from "./StatsCards.jsx";
-import TaskTable from "./TaskTable.jsx";
-import TaskModal from "./TaskModal.jsx";
-import SettingsModal from "./SettingsModal.jsx";
+import Sidebar from "../components/Sidebar.jsx";
+import StatsCards from "../components/StatsCards.jsx";
+import TaskTable from "../components/TaskTable.jsx";
+import TaskModal from "../components/TaskModal.jsx";
+import SettingsModal from "../components/SettingsModal.jsx";
 
 const DashboardPage = () => {
   const router = useNavigate();
