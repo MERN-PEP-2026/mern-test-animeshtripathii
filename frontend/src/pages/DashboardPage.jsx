@@ -9,19 +9,13 @@ import SettingsModal from "../components/SettingsModal.jsx";
 
 const DashboardPage = () => {
   const router = useNavigate();
-  
-  // States renamed for obscurity
   const [sessionUser, setSessionUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
   const [collection, setCollection] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
   const [queryTerm, setQueryTerm] = useState("");
   const [isLoaderActive, setIsLoaderActive] = useState(true);
-  
-  // Modals
   const [dialogState, setDialogState] = useState({ open: false, editingRecord: null });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  
-  // Pagination & Stats
   const [pager, setPager] = useState({ current: 1, max: 1, totalItems: 0 });
   const [metrics, setMetrics] = useState({ sum: 0, pendingCount: 0, doneCount: 0 });
 
@@ -137,8 +131,6 @@ const DashboardPage = () => {
     const d = new Date(rawDate);
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   };
-
-  // derived arrays
   const fallbackCollection = Array.isArray(collection) ? collection : [];
   const renderedList = queryTerm
     ? fallbackCollection.filter(c => 
