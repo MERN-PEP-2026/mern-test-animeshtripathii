@@ -1,0 +1,2 @@
+Frontend URL: https://mern-test-animeshtripathii.vercel.app/
+Backend URL: https://mern-test-inky-seven.vercel.app/
